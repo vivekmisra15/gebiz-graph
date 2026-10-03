@@ -87,7 +87,7 @@ The script prints PASS or FAIL for each check and exits with an error if any fai
 
 ## Known limits
 
-- Supplier names are cleaned deterministically (case, punctuation, company suffixes) and nothing more. There is no entity resolution. The cleanup currently merges a few Singapore and Malaysian entities that share a trading name.
+- Supplier names are cleaned deterministically (case, punctuation, company suffixes) and nothing more. There is no entity resolution. Foreign suffixes such as `SDN BHD` are kept, so a Singapore `PTE LTD` and a Malaysian `SDN BHD` with the same trading name stay as separate suppliers.
 - Agencies are procuring units as published, with no roll-up to ministries.
 - "Award by interface record" (686 rows) has undocumented provenance. It is counted and its status string is kept.
 
