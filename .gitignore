@@ -1,0 +1,13 @@
+# Virtual environment and OS clutter
+.venv/
+.DS_Store
+
+# Local backups
+*.bak
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Never commit credentials (they live in environment variables only)
+.env
