@@ -100,9 +100,11 @@ def money(x):
 
 # Suffixes removed from the END of a supplier name, repeatedly, longest first.
 # This is deterministic cleanup only. No fuzzy matching, no entity resolution.
+# "SDN BHD" and "BHD" are deliberately NOT here: a Malaysian company and a Singapore
+# company with the same trading name are different legal entities, so they stay separate.
 SUPPLIER_SUFFIXES = [
-    "PRIVATE LIMITED", "PTE LIMITED", "PTE LTD", "PTY LTD", "SDN BHD", "CO LTD",
-    "LIMITED", "LTD", "LLP", "LLC", "INC", "CORPORATION", "CORP", "PLC", "BHD", "PTE",
+    "PRIVATE LIMITED", "PTE LIMITED", "PTE LTD", "PTY LTD", "CO LTD",
+    "LIMITED", "LTD", "LLP", "LLC", "INC", "CORPORATION", "CORP", "PLC", "PTE",
 ]
 
 
