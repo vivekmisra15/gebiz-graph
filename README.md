@@ -16,8 +16,8 @@ In an audited setting, a model should not write its own queries or invent its ow
 | Step | What | State |
 |---|---|---|
 | 1 | Loader: CSV to Neo4j, with checks | Done |
-| 2 | Metric layer: Metric nodes M1 to M4 and fixed Cypher templates | Done. M1 and M2 verified against pandas; M3 and M4 stored but untested until step 3 |
-| 3 | Classification of each tender into the taxonomy (Jev, plus a keyword fallback) | Not started |
+| 2 | Metric layer: Metric nodes M1 to M4 and fixed Cypher templates | Done. M1 to M4 all verified against pandas (M3 and M4 after step 3) |
+| 3 | Classification of each tender into the taxonomy (Jev, plus a keyword fallback) | Done. 12,052 tenders classified, 0 failures; findings in RESULTS.md |
 | 4 | Calibration: set the confidence threshold on about 30 hand labels | Not started |
 | 5 | Router: a natural-language question picks one template, or abstains | Not started |
 | 6 | Audit log of every classification and router decision | Not started |
@@ -40,12 +40,17 @@ Things to know before reading any number from it:
 
 | File | Purpose |
 |---|---|
-| `gebiz_graph.py` | The whole build in one script: loader, checks, metric layer |
+| `gebiz_graph.py` | The whole build in one script: loader, checks, metric layer, classification |
+| `PLAN.md` | Plain-language plan and a dated decision log (progress is tracked here in the Status table, not there) |
+| `RESULTS.md` | Findings from each run, kept for reference |
 | `SCHEMA.md` | Design reference: nodes, relationships, taxonomy v1.0, metrics, loader rules, query templates |
 | `CLAUDE.md` | Project brief and constraints for the AI coding assistant used on this project |
 | `gebiz.csv` | The source dataset |
 | `sample_150_tenders_classified_reviewed.csv` | 150 hand-labelled tenders used to set the taxonomy (`sample_150_tenders.csv` is the unlabelled original) |
-| `profiling_schema v2.py` | One-off profiling script that produced the facts in SCHEMA.md section 2 |
+| `helpers/profile_gebiz_v2.py` | One-off profiling script that produced the facts in SCHEMA.md section 2 and the 150-tender sample |
+| `helpers/smoke_test_jev.py` | First live check of the Jev call on 5 tenders |
+| `helpers/analyse_classification_log.py` | Reproduces the step 3 figures in RESULTS.md from the audit log |
+| `classification_log.jsonl` | Audit log of every classification (git-ignored, regenerable) |
 
 ## Run it
 
@@ -80,7 +85,7 @@ The script prints PASS or FAIL for each check and exits with an error if any fai
 
 ## Design rules
 
-- **One script.** Standard library, pandas, the Neo4j driver and (from step 3) the Jev SDK only.
+- **One build script.** Standard library, pandas, the Neo4j driver and (from step 3) the Jev SDK only. One-off helper scripts live in `helpers/` and are not part of the build.
 - **Parameterized Cypher only.** No query is built by string concatenation.
 - **Metrics are defined once.** A slice is a dimension, not a new metric. "Spend" is not a defined term; the metric is "awarded value".
 - **UNCLASSIFIED is a query-time bucket**, not a category. It means the model was not confident. It is different from "Other Services", where the model is confident that nothing else fits.
