@@ -24,7 +24,7 @@ NST000ETT22000110,"Supply, Delivery, Installation, Testing and Commisioning of o
 JTC000ETT23000125,PROCUREMENT OF CONTACT CENTRE SERVICE FOR JTC CORPORATION,Jurong Town Corporation,C10,Other Services
 MHA00003000007742,Multi-Disciplinary Consultancy Services for Additions and Alterations Works to Existing Multi-Purpose Hall in National Service Training Centre,Ministry of Home Affairs - Ministry Headquarter 1,C04,Professional & Consultancy Services
 ITE000ETT22000015,"ITEa22-00262_HP-Supply, Delivery, Installation, Testing and Commissioning of New Kitchen Equipment (Choa Chu Kang and Ang Mo Kio Campuses)",Institute of Technical Education,C07,Equipment & Goods Supply
-HPB000ETT21000028,CM-ITT-PANEL OF PREMIUM SUPPLIERS TO HEALTH PROMOTION BOARD,Health Promotion Board,C07,Equipment & Goods Supply
+HPB000ETT21000028,CM-ITT-PANEL OF PREMIUM SUPPLIERS TO HEALTH PROMOTION BOARD,Health Promotion Board,C08,Medical & Healthcare Supplies
 NST000ETT22000044,"Invitation to Tender: Retrofit Works of offices at levels 5, 7 and 8, Nanos, Biopolis","Agency for Science, Technology and Research",C02,Construction & Civil Works
 JTC000ETT21000101,PROPOSED REINSTATEMENT OF VACANT UNIT AT BLK 16 DEFU LANE 10 #01-374 AND REPAIR/STRENGTHEN THE EXISTING STRUCTURE FOR BOTH UNITS #01-372 (OCCUPIED UNIT) AND #01-374    AND    PROPOSED RECONSTRUCTION AND REPAIR WORKS TO BLK 1081 EUNOS AVE 7 FIRE AFFECTED UNIT #01-170 & #01-172,Jurong Town Corporation,C02,Construction & Civil Works
 LTA000ETT24000069,Design and Construction of Cycling Paths for East Region,Land Transport Authority,C02,Construction & Civil Works
@@ -108,8 +108,8 @@ SSC000ETT24000042,PROVISION OF MULTI-DISCIPLINARY TEAM CONSULTANCY SERVICES FOR 
 SFA000ETT23000017,"Tender for Digital Transformation in NCFS via Supply, Development and Commissioning of Digital Archival System",Singapore Food Agency,C01,IT & Digital Services
 NHB000ETT22000014,Invitation to Tender (ITT) for the Master Planning Design Consultancy Services for the Revamp at the National Museum of Singapore including Singapore History Gallery & Glass Rotunda,National Heritage Board,C04,Professional & Consultancy Services
 LTA000ETT25000044,Independent Review on the In-House Design of Tunnel Ventilation Systems for Cross Island Line and Downtown Line Stage 2 Extension,Land Transport Authority,C04,Professional & Consultancy Services
-CDVHQ0ETT21000045,Invitation to Tender for the Proposed Early Intervention Programme for Infants and Children (EIPIC) Centre at Fernvale Woods,Ministry of Social and Family Development - Ministry Headquarter,C10,Other Services
-DEF000ETT20300060,Please refer to the attached tender documents for details.,Ministry of Defence,C10,Other Services
+CDVHQ0ETT21000045,Invitation to Tender for the Proposed Early Intervention Programme for Infants and Children (EIPIC) Centre at Fernvale Woods,Ministry of Social and Family Development - Ministry Headquarter,C06,"Events, Communications & Training"
+DEF000ETT20300060,Please refer to the attached tender documents for details.,Ministry of Defence,UNCLASSIFIED,
 PAS000ETT23000043,CYCLICAL MAINTENANCE PROGRAMME (CMP) AND ADDITIONAL & ALTERATION (A&A) WORKS TO NEE SOON EAST COMMUNITY CLUB (CC) AT 1 YISHUN AVE 9 SINGAPORE 768893,People's Association,C02,Construction & Civil Works
 CPF000ETT24000020,Maintenance of Network Equipment,Central Provident Fund Board,C01,IT & Digital Services
 JTC000ETT22000057,Sewer Upgrading at Benoi-Gul Industrial Estate,Jurong Town Corporation,C02,Construction & Civil Works
