@@ -29,7 +29,7 @@ Use Jev for exactly one job here: classify each tender description into one of t
 
 ## Hard constraints
 
-1. **Single file.** All build code lives in one standalone Python script (`gebiz_graph.py`). Standard library, `pandas`, the Neo4j Python driver, and the Jev SDK only. No frameworks, no extra modules.
+1. **Single file.** All build code lives in one standalone Python script (`gebiz_graph.py`). Standard library, `pandas`, the Neo4j Python driver, and the Jev SDK only. No frameworks, no extra modules. One-off helper scripts (profiling, smoke tests, log analysis) live in `helpers/`; they are not build code and the build never imports them.
 2. **Public data only.** The project reads the public GeBIZ dataset from data.gov.sg and nothing else. No other datasets or data sources.
 3. **No ML math.** No loss functions, embeddings training, or model internals. This project is about the data and semantic layer, not model theory.
 4. **Parameterized Cypher only.** Never build Cypher by string concatenation. Parameterization is the precondition for access control later.
@@ -71,9 +71,11 @@ Out of scope: visualisation or dashboards, graph algorithms (centrality, communi
 - When a result surprises you, say so and verify it before building on it.
 - Before adding a dependency, a file, or a feature, ask whether the thesis needs it.
 - Show numbers with units (S$) and say whether they are by count or by value.
+- At the end of each build step, update the Status table in README.md and append any new decisions to the log in PLAN.md. PLAN.md never records progress; README.md is the only place for it.
 
 ## Open items
 
-- Taxonomy is DRAFT v0 until the 150-tender sample is labelled. Do not hard-code categories as final. Load them from one table at the top of the script.
-- Confirm whether "Unknown" appears as a supplier on rows that are not "No Suppliers".
-- Jev SDK call shape: confirm from documentation.
+- Taxonomy is frozen as v1.0 (SCHEMA.md section 5), after the 150-tender sample was labelled and reviewed. Changes need a new version number. Keep loading categories from the one table at the top of the script.
+- Closed: "Unknown" does not appear as a supplier on any row that is not "No Suppliers" (0 rows).
+- Jev SDK call shape: read from the docs and checked against the installed typesafe-sdk 0.7.2 (module `typesafe_sdk`). Still to confirm with a live call (smoke test at the start of step 3).
+- Probability vs confidence: both are stored on `CLASSIFIED_AS`. Which one the threshold tests is decided in step 4 calibration. Until then queries use `probability`.
