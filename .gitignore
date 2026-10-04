@@ -11,3 +11,6 @@ __pycache__/
 
 # Never commit credentials (they live in environment variables only)
 .env
+
+# Regenerable audit output from step 3
+classification_log.jsonl

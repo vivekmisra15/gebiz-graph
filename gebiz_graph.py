@@ -1,8 +1,8 @@
 """
-gebiz_graph.py: GeBIZ knowledge graph, build steps 1 and 2 (loader + metric layer).
+gebiz_graph.py: GeBIZ knowledge graph, build steps 1 to 3 (loader, metric layer, classification).
 
 Design reference: SCHEMA.md (v0.3). Project rules: CLAUDE.md.
-Steps 3 onward (classification, calibration, router, audit log) are NOT here yet.
+Steps 4 onward (calibration, router, full audit log) are NOT here yet.
 
 WHAT IT DOES
   1. Reads gebiz.csv and applies the loader rules (SCHEMA.md section 7).
@@ -16,7 +16,7 @@ INSTALL (inside a virtual environment, so system Python is untouched)
     python3 -m venv .venv
     source .venv/bin/activate
     pip install pandas==2.2.3 neo4j==6.3.1
-  Step 3 will also need:  pip install typesafe-sdk==0.7.2
+  Step 3 also needs:  pip install typesafe-sdk==0.7.2   and   export TYPESAFE_API_KEY=<key>
 
 NEO4J (needs version 5.x or later)
   Docker example:
@@ -32,6 +32,10 @@ RUN
     python gebiz_graph.py --prepare-only   # pandas checks only, no Neo4j needed
     python gebiz_graph.py                  # full load + checks + metric layer
     python gebiz_graph.py --reset          # wipe graph data first, then reload
+    python gebiz_graph.py --trial 20       # step 3 dry run on 20 hand-labelled tenders, no Neo4j writes
+    python gebiz_graph.py --classify       # step 3 full run: Jev on every tender, writes CLASSIFIED_AS
+  Without TYPESAFE_API_KEY, --trial uses the keyword rules instead of Jev.
+  Every classification appends a line to classification_log.jsonl (git-ignored).
 
 RE-RUNNING
   Every write uses MERGE on a unique key and SET (not +=), so running twice
@@ -92,6 +96,243 @@ FISCAL_YEARS = [2021, 2022, 2023, 2024, 2025]
 
 def money(x):
     return f"S${x:,.0f}"
+
+
+# ---------------------------------------------------------------------------
+# STEP 3: classification (Jev, plus a keyword-rule fallback)
+# ---------------------------------------------------------------------------
+
+JEV_MODEL = "jev-1.13.0"
+RULES_MODEL = "keyword-rules-v1"
+JEV_WORKERS = 8                                   # parallel Jev calls
+START_THRESHOLD = 0.7                             # starting value; step 4 calibration sets the final one
+SAMPLE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "sample_150_tenders_classified_reviewed.csv")
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "classification_log.jsonl")
+
+# Jev sees option names and descriptions, not codes, so the label is the option name.
+JEV_QUESTION_TEXT = "Pick the one category that best describes this Singapore government tender."
+LABEL_TO_CODE = {label: code for code, label, _desc in TAXONOMY}
+CODE_TO_LABEL = {code: label for code, label, _desc in TAXONOMY}
+
+# Fallback rules: plain keyword counts. Lower-case substrings; the category with
+# the most hits wins, ties go to the category listed first. No hit = no answer.
+# This is a crude baseline to compare Jev against, not a classifier to trust.
+KEYWORD_RULES = [
+    ("C01", ["software", "system", "digital", "cyber", "network", "database", "cloud", "portal",
+             "website", "application", " ict ", "server", "licence", "license", "wifi", "wi-fi"]),
+    ("C02", ["construction", "civil", "design and build", "design-and-build", "renovation",
+             "upgrading", "demolition", "addition and alteration", "a&a", "fit-out", "fitout",
+             "proposed ", "erection", "sewer", "drain", "road"]),
+    ("C03", ["cleaning", "security services", "landscap", "horticultur", "tree", "maintenance",
+             "servicing", "facilities management", "pest control", "air-con", "operation and maintenance"]),
+    ("C04", ["consultancy", "consultant", "advisory", "professional services", "engineering services",
+             "architect", "audit", "inspection", "valuation"]),
+    ("C05", ["research", "study", "studies", "survey", "baseline", "hydrographic"]),
+    ("C06", ["event", "publicity", "printing", "media", "training", "course", "workshop",
+             "exhibition", "video", "photograph", "advertis", "campaign", "communications"]),
+    ("C07", ["supply", "purchase", "equipment", "instrument", "machine", "consumable",
+             "furniture", "uniform", "vehicle"]),
+    ("C08", ["medical", "clinical", "laborator", "reagent", "test kit", "pharmaceutical",
+             "vaccine", "surgical", "health product"]),
+    ("C09", ["transport", "delivery", "logistics", "warehous", "cold chain", "relocation",
+             "shuttle", "freight", "courier", "bus "]),
+    ("C10", ["insurance", "contact centre", "lifeguard", "calibration"]),
+]
+
+
+def classify_with_rules(description):
+    """Keyword fallback. Returns (code or None, hit count). It has no probability."""
+    text = " " + description.lower() + " "
+    best_code, best_hits = None, 0
+    for code, words in KEYWORD_RULES:
+        hits = sum(1 for w in words if w in text)
+        if hits > best_hits:
+            best_code, best_hits = code, hits
+    return best_code, best_hits
+
+
+_jev_client = None
+
+
+def jev_client():
+    """One shared client, created on first use. Reads TYPESAFE_API_KEY from the environment."""
+    global _jev_client
+    if _jev_client is None:
+        from typesafe_sdk import TypeSafeClient     # imported here so other steps need no SDK
+        _jev_client = TypeSafeClient()
+    return _jev_client
+
+
+def classify_with_jev(description):
+    """One Jev call: a closed-set Choice over the taxonomy. Returns a dict."""
+    from typesafe_sdk import Choice
+    question = Choice(
+        instructions=JEV_QUESTION_TEXT,
+        criteria={label: desc for _code, label, desc in TAXONOMY},
+    )
+    resp = jev_client().system_one(state=description, questions={"category": question},
+                                   model=JEV_MODEL)
+    ans = resp.answers["category"]
+    if ans.choice not in LABEL_TO_CODE:
+        raise ValueError(f"Jev returned a choice outside the taxonomy: {ans.choice!r}")
+    probs = {LABEL_TO_CODE[label]: p for label, p in ans.probabilities.items() if label in LABEL_TO_CODE}
+    return {"code": LABEL_TO_CODE[ans.choice], "probability": probs[LABEL_TO_CODE[ans.choice]],
+            "confidence": ans.confidence, "probabilities": probs, "model": JEV_MODEL,
+            "input_tokens": resp.usage.input_tokens, "output_tokens": resp.usage.output_tokens}
+
+
+def classify_detail(description):
+    """Classify with Jev if TYPESAFE_API_KEY is set, otherwise with the keyword rules.
+    Returns a dict with code, probability, confidence, probabilities and model.
+    The keyword fallback has no probability or confidence, so those are None."""
+    if os.environ.get("TYPESAFE_API_KEY"):
+        return classify_with_jev(description)
+    code, _hits = classify_with_rules(description)
+    return {"code": code, "probability": None, "confidence": None, "probabilities": None,
+            "model": RULES_MODEL, "input_tokens": 0, "output_tokens": 0}
+
+
+def classify_tender(description):
+    """The one function behind which the model sits (CLAUDE.md): description in,
+    (category_code, probability) out. Probability is None when the keyword fallback was used."""
+    result = classify_detail(description)
+    return result["code"], result["probability"]
+
+
+def classify_many(tenders, workers=JEV_WORKERS):
+    """Run classify_detail over a DataFrame of tenders, in parallel. Never raises on one bad
+    tender: failures are returned separately so a long run is not lost to one error."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(row):
+        try:
+            return row["tender_no"], classify_detail(row["description"]), None
+        except Exception as exc:                    # noqa: BLE001 (report and carry on)
+            return row["tender_no"], None, f"{type(exc).__name__}: {exc}"
+
+    rows = [r for _, r in tenders.iterrows()]
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        outcomes = list(pool.map(one, rows))
+    ok = {tn: res for tn, res, err in outcomes if err is None}
+    failed = {tn: err for tn, res, err in outcomes if err is not None}
+    return ok, failed
+
+
+def append_audit_log(tenders, ok, mode):
+    """Audit trail (step 6 covers the classification step too): one JSON line per tender,
+    with the full probability distribution and what the keyword rules said."""
+    import json
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    desc = dict(zip(tenders["tender_no"], tenders["description"]))
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        for tn, res in ok.items():
+            rule_code, _ = classify_with_rules(desc[tn])
+            f.write(json.dumps({"time": now, "mode": mode, "step": "classify", "tender_no": tn,
+                                "taxonomy_version": TAXONOMY_VERSION, "model": res["model"],
+                                "code": res["code"], "probability": res["probability"],
+                                "confidence": res["confidence"], "probabilities": res["probabilities"],
+                                "rule_code": rule_code}) + "\n")
+
+
+def run_trial(df_tenders, n):
+    """Dry run: classify N tenders from the hand-labelled sample. Writes nothing to Neo4j."""
+    hand = pd.read_csv(SAMPLE_PATH, dtype=str, keep_default_na=False).set_index("tender_no")["my_category"]
+    pick = df_tenders[df_tenders["tender_no"].isin(hand.index)].sample(n=n, random_state=0)
+    use_jev = bool(os.environ.get("TYPESAFE_API_KEY"))
+    print(f"\nTRIAL: {n} tenders from the hand-labelled sample, "
+          f"classifier = {JEV_MODEL if use_jev else RULES_MODEL}. Nothing is written to Neo4j.")
+    ok, failed = classify_many(pick)
+    append_audit_log(pick, ok, mode="trial")
+    print(f"{'tender_no':<20}{'hand':<14}{'model':<6}{'prob':>6}{'conf':>6}  {'rules':<6} text")
+    right_model = right_rules = labelled = below = 0
+    tokens = 0
+    for _, row in pick.iterrows():
+        tn = row["tender_no"]
+        if tn not in ok:
+            print(f"{tn:<20}FAILED: {failed[tn]}")
+            continue
+        res = ok[tn]
+        rule_code, _ = classify_with_rules(row["description"])
+        prob = "-" if res["probability"] is None else f"{res['probability']:.2f}"
+        conf = "-" if res["confidence"] is None else f"{res['confidence']:.2f}"
+        print(f"{tn:<20}{hand[tn]:<14}{str(res['code']):<6}{prob:>6}{conf:>6}  {str(rule_code):<6} "
+              f"{row['description'][:50]}")
+        tokens += res["input_tokens"]
+        if hand[tn] in CODE_TO_LABEL:               # skip the UNCLASSIFIED hand-label
+            labelled += 1
+            right_model += res["code"] == hand[tn]
+            right_rules += rule_code == hand[tn]
+        if res["probability"] is not None and res["probability"] < 0.7:
+            below += 1
+    print(f"\nAgainst hand labels ({labelled} labelled tenders, counts only):")
+    print(f"  {JEV_MODEL if use_jev else RULES_MODEL}: {right_model} right")
+    print(f"  keyword rules: {right_rules} right")
+    if use_jev:
+        print(f"  below the starting threshold of 0.7 (would abstain): {below} of {len(ok)}")
+        print(f"  input tokens used: {tokens:,}")
+    print(f"  failed calls: {len(failed)}")
+    print(f"  audit lines appended to {os.path.basename(LOG_PATH)}")
+
+
+# SCHEMA.md section 4. Deleting any old edge first means re-running never leaves two
+# CLASSIFIED_AS edges on one tender, even if the category changed.
+WRITE_CLASSIFICATIONS = """
+UNWIND $rows AS row
+MATCH (t:Tender {tender_no: row.tender_no})
+OPTIONAL MATCH (t)-[old:CLASSIFIED_AS]->()
+DELETE old
+WITH DISTINCT t, row
+MATCH (c:Category {code: row.code})
+CREATE (t)-[r:CLASSIFIED_AS]->(c)
+SET r.probability = row.probability,
+    r.confidence = row.confidence,
+    r.model = row.model,
+    r.taxonomy_version = row.taxonomy_version,
+    r.classified_at = datetime(row.classified_at)
+"""
+ALREADY_CLASSIFIED = """
+MATCH (t:Tender)-[r:CLASSIFIED_AS]->()
+WHERE r.model = $model AND r.taxonomy_version = $taxonomy_version
+RETURN t.tender_no AS tender_no
+"""
+
+
+def run_classification(driver, df_tenders):
+    """Full run: classify every tender not yet done by this model and taxonomy version,
+    and write the CLASSIFIED_AS edges. Needs the key (rule-only edges have no probability)."""
+    from datetime import datetime, timezone
+    if not os.environ.get("TYPESAFE_API_KEY"):
+        sys.exit("--classify needs TYPESAFE_API_KEY (the keyword fallback has no probability, "
+                 "so it is only used in --trial). Nothing was changed.")
+    with session_for(driver) as session:
+        done = {r["tender_no"] for r in session.run(
+            ALREADY_CLASSIFIED, model=JEV_MODEL, taxonomy_version=TAXONOMY_VERSION)}
+    todo = df_tenders[~df_tenders["tender_no"].isin(done)]
+    print(f"\nCLASSIFY: {len(df_tenders):,} tenders, {len(done):,} already done, {len(todo):,} to do.")
+    ok, failed = {}, {}
+    chunk = 500                                      # write and log in chunks so a crash loses little
+    for i in range(0, len(todo), chunk):
+        part = todo.iloc[i:i + chunk]
+        part_ok, part_failed = classify_many(part)
+        ok.update(part_ok)
+        failed.update(part_failed)
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        rows = [{"tender_no": tn, "code": r["code"], "probability": r["probability"],
+                 "confidence": r["confidence"], "model": r["model"],
+                 "taxonomy_version": TAXONOMY_VERSION, "classified_at": now}
+                for tn, r in part_ok.items()]
+        with session_for(driver) as session:
+            run_batches(session, WRITE_CLASSIFICATIONS, rows)
+        append_audit_log(part, part_ok, mode="full")
+        print(f"  {i + len(part):,} / {len(todo):,} processed, {len(failed)} failed so far")
+    tokens = sum(r["input_tokens"] for r in ok.values())
+    print(f"Done. Written: {len(ok):,}. Failed: {len(failed)}. Input tokens: {tokens:,} "
+          f"(about US${tokens / 1e6 * 0.042:.2f} at US$0.042 per million).")
+    for tn, err in list(failed.items())[:10]:
+        print(f"  FAILED {tn}: {err}")
+    return ok, failed
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +433,8 @@ def build_tables(df):
 def check(results, label, actual, expected):
     ok = actual == expected
     results.append(ok)
-    shown = f"{actual:,}" if isinstance(actual, int) else actual
-    want = f"{expected:,}" if isinstance(expected, int) else expected
+    shown = f"{actual:,}" if isinstance(actual, int) and not isinstance(actual, bool) else actual
+    want = f"{expected:,}" if isinstance(expected, int) and not isinstance(expected, bool) else expected
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}: {shown}" + ("" if ok else f" (expected {want})"))
 
 
@@ -443,6 +684,16 @@ RETURN sum(CASE WHEN c.probability >= $threshold THEN r.amount_sgd ELSE 0 END) A
        sum(r.amount_sgd) AS total_sgd
 """,
     },
+    # M4 coverage by count: the second view of the same metric (SCHEMA.md section 6 asks for both).
+    "M4_COVERAGE_COUNT_FY": {
+        "metric_id": "M4",
+        "params": ["fy", "threshold"],
+        "cypher": """
+MATCH (t:Tender {awarded: true, fiscal_year: $fy})-[c:CLASSIFIED_AS]->(:Category)
+RETURN sum(CASE WHEN c.probability >= $threshold THEN 1 ELSE 0 END) AS classified_tenders,
+       count(t) AS total_tenders
+""",
+    },
 }
 
 # Metric nodes (SCHEMA.md section 6). Each points at its base template; the other
@@ -537,6 +788,46 @@ def metric_checks(driver, df, rows_edges, edges, suppliers_by_edge):
           abs(m2["top_n_share"] - want_share) < 1e-9, True)
     print(f"  [INFO] FY{fy} top-10 suppliers hold {m2['top_n_share']:.1%} of awarded value "
           f"({money(m2['top_n_sgd'])} of {money(m2['total_sgd'])}). By value, not by count.")
+    results += classification_metric_checks(driver, awarded, df)
+    return results
+
+
+def classification_metric_checks(driver, awarded, df):
+    """M3 and M4 against pandas, using the classifications as stored in Neo4j.
+    Skipped (with a message) if step 3 has not been run yet."""
+    with session_for(driver) as s:
+        stored = [r.data() for r in s.run(
+            "MATCH (t:Tender)-[c:CLASSIFIED_AS]->() RETURN t.tender_no AS tender_no, c.probability AS p")]
+    if not stored:
+        print("\n  [INFO] No CLASSIFIED_AS edges yet; M3 and M4 not checked (run --classify first).")
+        return []
+    results = []
+    prob = pd.DataFrame(stored).set_index("tender_no")["p"]
+    th = START_THRESHOLD
+    print(f"\n  M4 classification coverage at threshold {th} (by value in S$, and by count of awarded tenders):")
+    print(f"  {'FY':<8}{'by value':>10}{'classified S$':>22}{'total S$':>22}{'by count':>10}{'classified':>12}{'total':>8}")
+    all_tenders = df[df["tender_detail_status"] != NO_SUPPLIERS].drop_duplicates("tender_no")
+    for fy in FISCAL_YEARS:
+        # Independent pandas version.
+        rows = awarded[awarded["fiscal_year"] == fy]
+        ok_value = rows["tender_no"].map(prob) >= th
+        want_cls, want_tot = float(rows["awarded_amt"][ok_value].sum()), float(rows["awarded_amt"].sum())
+        tenders_fy = all_tenders[all_tenders["fiscal_year"] == fy]
+        ok_count = int((tenders_fy["tender_no"].map(prob) >= th).sum())
+        # Governed templates.
+        m4 = run_template(driver, "M4_COVERAGE_FY", {"fy": fy, "threshold": th})[0]
+        m4c = run_template(driver, "M4_COVERAGE_COUNT_FY", {"fy": fy, "threshold": th})[0]
+        print(f"  FY{fy:<6}{m4['classified_sgd'] / m4['total_sgd']:>10.1%}{money(m4['classified_sgd']):>22}"
+              f"{money(m4['total_sgd']):>22}{m4c['classified_tenders'] / m4c['total_tenders']:>10.1%}"
+              f"{m4c['classified_tenders']:>12,}{m4c['total_tenders']:>8,}")
+        check(results, f"M4 FY{fy} by value matches pandas (within S$0.01)",
+              abs(m4["classified_sgd"] - want_cls) < 0.01 and abs(m4["total_sgd"] - want_tot) < 0.01, True)
+        check(results, f"M4 FY{fy} by count matches pandas",
+              (m4c["classified_tenders"], m4c["total_tenders"]) == (ok_count, len(tenders_fy)), True)
+        # M3 splits the same classified value by category, so it must add up to M4.
+        m3 = run_template(driver, "M3_CATEGORY_SPEND_FY", {"fy": fy, "threshold": th})
+        check(results, f"M3 FY{fy} categories add up to M4 classified value (within S$0.01)",
+              abs(sum(r["awarded_value_sgd"] for r in m3) - m4["classified_sgd"]) < 0.01, True)
     return results
 
 
@@ -545,18 +836,30 @@ def metric_checks(driver, df, rows_edges, edges, suppliers_by_edge):
 # ---------------------------------------------------------------------------
 
 def main():
-    args = set(sys.argv[1:])
-    unknown = args - {"--prepare-only", "--reset"}
-    if unknown:
-        sys.exit(f"Unknown option(s): {sorted(unknown)}. Use --prepare-only and/or --reset.")
+    import argparse
+    parser = argparse.ArgumentParser(description="GeBIZ knowledge graph build (steps 1 to 3).")
+    parser.add_argument("--prepare-only", action="store_true", help="pandas checks only, no Neo4j")
+    parser.add_argument("--reset", action="store_true", help="wipe graph data first, then reload")
+    parser.add_argument("--trial", type=int, metavar="N",
+                        help="step 3 dry run: classify N hand-labelled sample tenders, write nothing to Neo4j")
+    parser.add_argument("--classify", action="store_true",
+                        help="step 3 full run: classify every tender with Jev and write CLASSIFIED_AS edges")
+    args = parser.parse_args()
+    if args.trial is not None and not 1 <= args.trial <= 150:
+        sys.exit("--trial N needs N between 1 and 150 (the size of the hand-labelled sample).")
 
     df = read_csv()
     print(f"Read {len(df):,} rows, {df['tender_no'].nunique():,} tenders from {os.path.basename(CSV_PATH)}")
     tenders, suppliers, agencies, edges, stats = build_tables(df)
+
+    if args.trial is not None:                       # needs no Neo4j at all
+        run_trial(tenders, args.trial)
+        return
+
     results = pandas_checks(df, tenders, suppliers, agencies, edges, stats)
     print_merge_sample(stats)
 
-    if "--prepare-only" in args:
+    if args.prepare_only:
         print("\n--prepare-only: stopping before Neo4j.")
         sys.exit(0 if all(results) else 1)
     if not all(results):
@@ -564,7 +867,16 @@ def main():
 
     driver = connect()
     try:
-        load_graph(driver, tenders, suppliers, agencies, edges, reset="--reset" in args)
+        if args.classify:                            # classification only; the graph is already loaded
+            run_classification(driver, tenders)
+            with session_for(driver) as session:
+                n_edges = scalar(session, "MATCH ()-[r:CLASSIFIED_AS]->() RETURN count(r)")
+                n_tenders_with = scalar(session, "MATCH (t:Tender)-[:CLASSIFIED_AS]->() RETURN count(DISTINCT t)")
+            ok = []
+            check(ok, "CLASSIFIED_AS edges", n_edges, len(tenders))
+            check(ok, "tenders with exactly one edge", n_tenders_with, n_edges)
+            sys.exit(0 if all(ok) else 1)
+        load_graph(driver, tenders, suppliers, agencies, edges, reset=args.reset)
         results += neo4j_checks(driver, tenders, suppliers, agencies, edges, stats)
         create_metrics(driver)
         results += metric_checks(driver, df, tenders[["tender_no", "fiscal_year", "awarded"]], edges, None)
