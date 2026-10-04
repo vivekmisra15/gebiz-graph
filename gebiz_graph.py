@@ -105,7 +105,7 @@ def money(x):
 JEV_MODEL = "jev-1.13.0"
 RULES_MODEL = "keyword-rules-v1"
 JEV_WORKERS = 8                                   # parallel Jev calls
-START_THRESHOLD = 0.7                             # starting value; step 4 calibration sets the final one
+THRESHOLD = 0.7                                   # set in step 4 calibration (PLAN.md): UNCLASSIFIED = probability below this
 SAMPLE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            "sample_150_tenders_classified_reviewed.csv")
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "classification_log.jsonl")
@@ -264,13 +264,13 @@ def run_trial(df_tenders, n):
             labelled += 1
             right_model += res["code"] == hand[tn]
             right_rules += rule_code == hand[tn]
-        if res["probability"] is not None and res["probability"] < 0.7:
+        if res["probability"] is not None and res["probability"] < THRESHOLD:
             below += 1
     print(f"\nAgainst hand labels ({labelled} labelled tenders, counts only):")
     print(f"  {JEV_MODEL if use_jev else RULES_MODEL}: {right_model} right")
     print(f"  keyword rules: {right_rules} right")
     if use_jev:
-        print(f"  below the starting threshold of 0.7 (would abstain): {below} of {len(ok)}")
+        print(f"  below the threshold of {THRESHOLD} (would abstain): {below} of {len(ok)}")
         print(f"  input tokens used: {tokens:,}")
     print(f"  failed calls: {len(failed)}")
     print(f"  audit lines appended to {os.path.basename(LOG_PATH)}")
@@ -803,7 +803,7 @@ def classification_metric_checks(driver, awarded, df):
         return []
     results = []
     prob = pd.DataFrame(stored).set_index("tender_no")["p"]
-    th = START_THRESHOLD
+    th = THRESHOLD
     print(f"\n  M4 classification coverage at threshold {th} (by value in S$, and by count of awarded tenders):")
     print(f"  {'FY':<8}{'by value':>10}{'classified S$':>22}{'total S$':>22}{'by count':>10}{'classified':>12}{'total':>8}")
     all_tenders = df[df["tender_detail_status"] != NO_SUPPLIERS].drop_duplicates("tender_no")

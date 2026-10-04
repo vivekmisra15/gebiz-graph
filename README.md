@@ -18,7 +18,7 @@ In an audited setting, a model should not write its own queries or invent its ow
 | 1 | Loader: CSV to Neo4j, with checks | Done |
 | 2 | Metric layer: Metric nodes M1 to M4 and fixed Cypher templates | Done. M1 to M4 all verified against pandas (M3 and M4 after step 3) |
 | 3 | Classification of each tender into the taxonomy (Jev, plus a keyword fallback) | Done. 12,052 tenders classified, 0 failures; findings in RESULTS.md |
-| 4 | Calibration: set the confidence threshold on about 30 hand labels | Not started |
+| 4 | Calibration: set the confidence threshold on about 30 hand labels | Done. Threshold 0.7 on probability; see RESULTS.md |
 | 5 | Router: a natural-language question picks one template, or abstains | Not started |
 | 6 | Audit log of every classification and router decision | Not started |
 
@@ -50,6 +50,8 @@ Things to know before reading any number from it:
 | `helpers/profile_gebiz_v2.py` | One-off profiling script that produced the facts in SCHEMA.md section 2 and the 150-tender sample |
 | `helpers/smoke_test_jev.py` | First live check of the Jev call on 5 tenders |
 | `helpers/analyse_classification_log.py` | Reproduces the step 3 figures in RESULTS.md from the audit log |
+| `calibration_labels.csv` | The 30 owner-approved hand labels used to calibrate the threshold |
+| `helpers/calibrate.py` | Compares Jev with those labels and shows what each threshold would do |
 | `classification_log.jsonl` | Audit log of every classification (git-ignored, regenerable) |
 
 ## Run it

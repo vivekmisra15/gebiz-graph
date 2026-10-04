@@ -52,3 +52,48 @@ M4 counts here use **awarded tenders only** (11,413 of the 12,052; the 639 "Awar
 | FY2025 | 90.8% | 28,030,321,003 | 30,882,176,691 | 87.0% | 2,003 | 2,303 |
 
 Reading it: count coverage is steady at 86% to 89% across years, while value coverage moves between 89% and 97% and is always higher than count coverage. The gap (value minus count) ranges from 2.6 points (FY2024) to 9.3 points (FY2021). FY2022 has the lowest value coverage (S$2.1B unclassified). Not yet investigated: which large contracts sit below 0.7 in FY2022 and FY2025. Value is dominated by a few large contracts, so a handful of tenders can move these percentages. Preliminary until the threshold is set in step 4.
+
+## Step 4: calibration, 2026-10-04
+
+**Decision.** Threshold 0.7, tested on `probability`. No further tuning. Both numbers stay stored on `CLASSIFIED_AS`. The setting is the `THRESHOLD` constant in `gebiz_graph.py`; M3 and M4 use it.
+
+**Reproduce.** `python helpers/calibrate.py` (reads `calibration_labels.csv` and the audit log; calls nothing).
+
+### The 30 labels
+
+3 per category (C01 to C10), drawn at random with a fixed seed from the owner's reviewed sample using the labels only (Jev's answers were not looked at before the list was approved). Excluded: the four doubtful tenders (CDVHQ0ETT21000045, DEF000ETT20300060, HPB000ETT21000028, MAS000ETT25000037) and the UNCLASSIFIED row. Owner approved the list after reviewing four borderline labels: NPB000ETT22000047 stays C05; SSC000ETT25000021 stays C08 (awkward fit, closest category); STB000ETT23000026 stays C01 (thin text, owner's educated guess); JUDSUPETT23000007 stays C09 (storage counts as warehousing). Notes are in the `label_note` column.
+
+### Result: Jev right on 27 of 30 (counts)
+
+| Tender | Hand label | Jev | Probability | Confidence |
+|---|---|---|---|---|
+| NPB000ETT22000047 (biodiversity studies consultancy) | C05 | C04 | 0.53 | 0.47 |
+| PUB000ETT23000137 (hydrographic survey, soil investigation) | C05 | C04 | 0.83 | 0.81 |
+| SSC000ETT25000021 (sports food) | C08 | C07 | 0.82 | 0.80 |
+
+All three errors sit on boundaries already known to be fuzzy (C04 vs C05; the awkward sports-food fit), and are arguable rather than clear failures. Only the first is caught at 0.7.
+
+### What each threshold does on the 30 (probability)
+
+| Threshold | Answered | Right | Wrong | Abstained (of which right) |
+|---|---|---|---|---|
+| 0.5 | 30 | 27 | 3 | 0 |
+| 0.6 | 29 | 27 | 2 | 1 (0) |
+| 0.7 | 28 | 26 | 2 | 2 (1) |
+| 0.8 | 28 | 26 | 2 | 2 (1) |
+| 0.9 | 25 | 25 | 0 | 5 (2) |
+
+Cost of each threshold across all 12,052 tenders (probability): coverage by count / by value is 0.5: 97.3% / 98.7%; 0.6: 92.5% / 95.4%; 0.7: 87.2% / 92.8%; 0.8: 81.6% / 89.9%; 0.9: 73.7% / 86.5%.
+
+### Why 0.7 on probability
+
+- Probability and confidence gave the same results at 0.7, 0.8 and 0.9 (they differ only at 0.5, where confidence also catches the 0.47 tender). The data does not prefer one, so the simpler number, already used by the stored M3/M4 templates, was kept.
+- 0.9 would remove the two remaining errors here, but that rests on two arguable boundary cases in 30 labels (fitting to noise), and it would abstain on about a quarter of all tenders (26.3% by count). CLAUDE.md says start at 0.7 and stop tuning.
+- Reading: about 2 of 28 answered tenders were wrong in this small sample, mostly boundary cases.
+
+### Limits
+
+- 30 labels cannot place a threshold precisely; the uncertainty around "2 of 28" is wide.
+- The labels come from the pool the taxonomy's boundary rules were derived from, and were picked 3 per category (not a random draw across categories), so 90% accuracy is likely an upper bound for the other tenders.
+- The abstention test row (DEF000ETT20300060, "Please refer to the attached tender documents") scores probability 0.99, so it does not abstain at any threshold. This is the vague-text weakness recorded under step 3. Calibration cannot fix it: the cause is how Jev reads C10, not the threshold.
+- Agreement here is accuracy only for these 30 labelled tenders.

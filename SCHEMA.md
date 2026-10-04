@@ -159,12 +159,13 @@ Remaining templates (M2, and slices by supplier and category) are written during
 | Taxonomy | Done: frozen as v1.0 (section 5). Four doubtful sample labels await owner confirmation. |
 | "Unknown" supplier on non-"No Suppliers" rows | Closed: checked, 0 rows. All 639 "Unknown" rows are "No Suppliers" and vice versa. The loader re-checks this on every run. |
 | "Award by interface record" (686 rows) | Provenance undocumented. Counted in M1, `source_status` retained. |
-| Threshold | Start at 0.7. Calibrate once on about 30 clean hand-labels. No further tuning. |
-| Jev SDK call shape | Read from the docs (docs.typesafe.ai): `TypeSafeClient().system_one(state=..., questions={name: Choice(instructions=..., criteria={option: description})})`; answer has `choice`, `probabilities`, `confidence`. Not yet confirmed by a live call; smoke test at the start of step 3. |
-| Probability vs confidence | Decided by owner 2026-10-04: store both on `CLASSIFIED_AS` (`probability` = `probabilities[choice]`, `confidence` = Jev's value). Which one the threshold tests is decided in step 4 calibration, on the hand-labels. Until then queries use `probability` (M3/M4 templates unchanged). |
+| Threshold | Set 2026-10-04 in step 4: 0.7 on `probability`, calibrated once on 30 hand-labels (`calibration_labels.csv`). No further tuning. The `THRESHOLD` constant in `gebiz_graph.py` is the single setting. |
+| Jev SDK call shape | Closed: read from the docs, checked against typesafe-sdk 0.7.2, confirmed by a live call on 2026-10-04: `TypeSafeClient().system_one(state=..., questions={name: Choice(instructions=..., criteria={option: description})})`; answer has `choice`, `probabilities`, `confidence`. |
+| Probability vs confidence | Closed 2026-10-04: both stored on `CLASSIFIED_AS`; the threshold tests `probability`. On the 30 calibration labels the two behaved the same at 0.7 to 0.9, so the simpler, already-used number was kept. |
 
 ## 11. Change log
 
 - v0.1: initial draft (GeBIZ, 10 categories + reserved UNCLASSIFIED node).
 - v0.2: profiling results folded in. M1 renamed "Awarded value". `AWARDED_TO` skipped for "No Suppliers". UNCLASSIFIED made a query-time bucket. `source_status` retained. Coverage reported by count and value.
 - v0.3: taxonomy frozen as v1.0 with descriptions and seven boundary rules; "Unknown" supplier check closed (0 rows); Jev call shape recorded from docs; probability vs confidence noted.
+- v0.4: threshold fixed at 0.7 on probability after step 4 calibration; Jev call shape and probability-vs-confidence items closed.

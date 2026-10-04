@@ -77,5 +77,5 @@ Out of scope: visualisation or dashboards, graph algorithms (centrality, communi
 
 - Taxonomy is frozen as v1.0 (SCHEMA.md section 5), after the 150-tender sample was labelled and reviewed. Changes need a new version number. Keep loading categories from the one table at the top of the script.
 - Closed: "Unknown" does not appear as a supplier on any row that is not "No Suppliers" (0 rows).
-- Jev SDK call shape: read from the docs and checked against the installed typesafe-sdk 0.7.2 (module `typesafe_sdk`). Still to confirm with a live call (smoke test at the start of step 3).
-- Probability vs confidence: both are stored on `CLASSIFIED_AS`. Which one the threshold tests is decided in step 4 calibration. Until then queries use `probability`.
+- Closed: Jev SDK call shape, read from the docs, checked against typesafe-sdk 0.7.2 (module `typesafe_sdk`) and confirmed by a live call (helpers/smoke_test_jev.py).
+- Closed in step 4: the threshold is 0.7 on `probability` (both numbers are still stored on `CLASSIFIED_AS`). Do not tune it further. It is the `THRESHOLD` constant in `gebiz_graph.py`.
