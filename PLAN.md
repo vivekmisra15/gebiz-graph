@@ -38,3 +38,4 @@ Append new entries at the bottom. Do not rewrite old ones; if a decision changes
 | 2026-10-04 | Secrets (Neo4j password, TypeSafe key) are never pasted into chat or saved in the project. |
 | 2026-10-04 | One build script stays the rule; one-off helper scripts live in `helpers/`. Run findings are logged in RESULTS.md. |
 | 2026-10-04 | Vague boilerplate descriptions (5 found) get confident C10 answers. Not fixed; reported as a finding in RESULTS.md. |
+| 2026-10-04 | Step 4 calibration. 30 hand labels (3 per category, picked from the labels alone, excluding the 4 doubtful tenders and the UNCLASSIFIED row). Jev right on 27 of 30. Threshold set at 0.7 on `probability`; no further tuning. Probability and confidence behaved the same on this set, so the simpler number was kept. Taxonomy stays frozen at v1.0 (the sports-food tender stays C08 as the closest fit). |
