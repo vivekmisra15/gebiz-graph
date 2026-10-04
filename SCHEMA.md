@@ -40,7 +40,7 @@ Status: taxonomy frozen as v1.0 after hand-labelling `sample_150_tenders_classif
 |---|---|---|
 | `(Agency)-[:ISSUED]->(Tender)` | none | One agency per tender. |
 | `(Tender)-[:AWARDED_TO]->(Supplier)` | `amount_sgd` | One edge per tender-supplier pair, created for every row except "No Suppliers" (17,825 edges before name merging). If name normalization merges two raw names inside one tender, sum their amounts onto one edge. |
-| `(Tender)-[:CLASSIFIED_AS]->(Category)` | `probability`, `model`, `taxonomy_version`, `classified_at` | Written for every tender, pointing at the model's top choice. `probability` is that choice's probability. This edge is the audit record. |
+| `(Tender)-[:CLASSIFIED_AS]->(Category)` | `probability`, `confidence`, `model`, `taxonomy_version`, `classified_at` | Written for every tender, pointing at the model's top choice. `probability` is that choice's probability; `confidence` is Jev's separate overall-trust number (null for the keyword fallback). This edge is the audit record. |
 | `(Metric)-[:SUPPORTS_DIMENSION]->(Dimension)` | none | Optional. A `dimensions` list property on Metric is sufficient for v1. |
 
 ## 5. Category taxonomy: v1.0
@@ -74,12 +74,13 @@ Frozen after labelling 150 tenders (`sample_150_tenders_classified_reviewed.csv`
 6. **Design and printing for publications and reports** goes to C06, not C04.
 7. **C10 only when the tender is clear but fits no other category.** An uninformative description (e.g. "Please refer to the attached tender documents") is not C10. It should fall below the threshold and be reported UNCLASSIFIED.
 
-### Known doubtful labels in the sample (not changed; owner to confirm)
+### Sample label review (resolved by owner, 2026-10-04)
 
-- CDVHQ0ETT21000045 (EIPIC centre at Fernvale Woods): labelled C10, reads like C02.
-- DEF000ETT20300060 ("Please refer to the attached tender documents"): labelled C10; by rule 7 it is unclassifiable.
-- Relocation of storage and servers (MAS): labelled C09; arguably C01.
-- C08 is thin (3 of 150) and holds laboratory kits and sports food. Kept as is; revisit if calibration shows it is unusable.
+- CDVHQ0ETT21000045 (EIPIC centre at Fernvale Woods): relabelled C10 to C06.
+- DEF000ETT20300060 ("Please refer to the attached tender documents"): relabelled C10 to UNCLASSIFIED (rule 7). Not a category; the sample now has one row whose correct answer is abstention. Exclude it from the clean calibration labels, or use it to check that the model abstains.
+- HPB000ETT21000028 (panel of premium suppliers to HPB): relabelled C07 to C08. Note C08 is now 4 of 150.
+- Relocation of storage and servers (MAS): confirmed C09.
+- C08 is thin and holds laboratory kits and sports food. Revisit if calibration shows it is unusable.
 
 ## 6. Governed metrics
 
@@ -160,7 +161,7 @@ Remaining templates (M2, and slices by supplier and category) are written during
 | "Award by interface record" (686 rows) | Provenance undocumented. Counted in M1, `source_status` retained. |
 | Threshold | Start at 0.7. Calibrate once on about 30 clean hand-labels. No further tuning. |
 | Jev SDK call shape | Read from the docs (docs.typesafe.ai): `TypeSafeClient().system_one(state=..., questions={name: Choice(instructions=..., criteria={option: description})})`; answer has `choice`, `probabilities`, `confidence`. Not yet confirmed by a live call; smoke test at the start of step 3. |
-| Probability vs confidence | `CLASSIFIED_AS.probability` stores `probabilities[choice]` (the top choice's probability). Jev also returns `confidence`, a different number; record it in the audit log but do not use it for the threshold. Owner to confirm. |
+| Probability vs confidence | Decided by owner 2026-10-04: store both on `CLASSIFIED_AS` (`probability` = `probabilities[choice]`, `confidence` = Jev's value). Which one the threshold tests is decided in step 4 calibration, on the hand-labels. Until then queries use `probability` (M3/M4 templates unchanged). |
 
 ## 11. Change log
 
