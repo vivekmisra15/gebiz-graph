@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GeBIZ Router Replay</title>
+<style>
+:root{
+  --bg:#f7f6f2; --panel:#ffffff; --ink:#1d2330; --muted:#5d6678; --line:#e3e0d8;
+  --accent:#2f5d8a; --accent-soft:#e4edf6; --ok:#2e7d5b; --ok-soft:#e1f1ea;
+  --warn:#b4571a; --warn-soft:#faeadd; --bar:#c9d6e4; --bar-strong:#2f5d8a;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#14171d; --panel:#1c2029; --ink:#e8eaf0; --muted:#98a1b3; --line:#2c3240;
+    --accent:#7fb0e0; --accent-soft:#23324a; --ok:#6cc79b; --ok-soft:#1b3a2e;
+    --warn:#e99a62; --warn-soft:#3d2a1b; --bar:#34425a; --bar-strong:#7fb0e0;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:32px 16px 56px}
+h1{font:600 28px/1.2 ui-serif,Georgia,"Times New Roman",serif;margin:0 0 8px;letter-spacing:-.01em}
+.lede{color:var(--muted);max-width:68ch;margin:0 0 24px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.tab{background:none;border:0;color:var(--muted);font:inherit;font-weight:600;padding:10px 14px;cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab:focus-visible,.q:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.list{display:flex;flex-direction:column;gap:6px}
+.q{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);font:inherit;cursor:pointer}
+.q[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.n{color:var(--muted);font-variant-numeric:tabular-nums;min-width:1.6em}
+.q span.t{flex:1;font-size:15px}
+.badge{font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.badge.ok{background:var(--ok-soft);color:var(--ok)}
+.badge.ab{background:var(--warn-soft);color:var(--warn)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.card h2{font-size:18px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 0 6px}
+.prow{display:grid;grid-template-columns:minmax(0,13rem) 1fr 3rem;gap:10px;align-items:center;font-size:14px;margin:4px 0}
+.prow .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{height:10px;background:var(--bar);border-radius:99px;overflow:hidden}
+.fill{height:100%;background:var(--bar-strong);border-radius:99px}
+.prow.pick .name{font-weight:600}
+.prow .v{text-align:right;font-variant-numeric:tabular-nums}
+.verdict{border-radius:10px;padding:12px 14px;margin-top:6px}
+.verdict.ok{background:var(--ok-soft)} .verdict.ab{background:var(--warn-soft)}
+.verdict strong{display:block;margin-bottom:2px}
+.verdict .big{font:600 22px/1.3 ui-serif,Georgia,serif}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+td,th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-weight:600}
+td.r,th.r{text-align:right}
+.note{border-left:3px solid var(--warn);padding:4px 12px;margin-top:14px;color:var(--muted);font-size:14px}
+.def{font-size:14px;color:var(--muted)}
+details{margin-top:14px} summary{cursor:pointer;color:var(--accent);font-size:14px}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);
+  border-radius:8px;padding:10px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;margin:8px 0 0}
+.cov{display:grid;grid-template-columns:5.5rem 1fr;gap:8px 12px;align-items:center;margin:6px 0}
+.pair{display:flex;flex-direction:column;gap:3px}
+.pair .track{height:12px}
+.pair .fill.count{background:var(--muted);opacity:.55}
+.pair small{font-size:12px;color:var(--muted)}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--muted);margin:8px 0 14px;flex-wrap:wrap}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+footer{margin-top:36px;color:var(--muted);font-size:13px;max-width:78ch}
+footer a{color:var(--accent)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The model selects. People define.</h1>
+  <p class="lede">A replay of the GeBIZ knowledge graph router. Singapore government procurement awards (FY2021 to FY2025) sit in a graph with human-written categories and metrics. The model only picks among them, every pick is logged with its probability, and below a confidence line it abstains. This page replays one real run; it makes no live calls.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-router" aria-selected="true" aria-controls="p-router">Router replay</button>
+    <button class="tab" role="tab" id="tab-cov" aria-selected="false" aria-controls="p-cov">Classification coverage</button>
+  </div>
+
+  <section id="p-router" role="tabpanel" aria-labelledby="tab-router">
+    <div class="grid">
+      <div class="list" id="list"></div>
+      <div class="card" id="detail"></div>
+    </div>
+  </section>
+
+  <section id="p-cov" role="tabpanel" aria-labelledby="tab-cov" hidden>
+    <div class="card">
+      <h2>How much of the awarded value could be classified?</h2>
+      <p class="sub">Tenders with a category probability of 0.7 or higher count as classified; the rest are UNCLASSIFIED. Large contracts were classified more confidently than small ones, so coverage by value runs higher than by count.</p>
+      <div class="legend"><span><i class="sw" style="background:var(--bar-strong)"></i>By value (S$)</span><span><i class="sw" style="background:var(--muted);opacity:.55"></i>By count (tenders)</span></div>
+      <div id="cov"></div>
+      <div class="note">Across all five years: 92.8% by value (S$114.9B of S$123.8B) and 87.2% by count (10,504 of 12,052 tenders). Awarded value is contract value at the award date, not cash spent.</div>
+    </div>
+  </section>
+
+  <footer>
+    Data: public GeBIZ awards from <a href="https://data.gov.sg">data.gov.sg</a> (Ministry of Finance, Open Data Licence). Model: Jev (jev-1.13.0) by TypeSafe AI, used only to choose from closed lists. Router run on 5 October 2026 against the project's Neo4j graph; figures are replayed from its audit log, router threshold 0.7. A demo set of 12 questions, not an evaluation. Source and write-up are in the repository.
+  </footer>
+</div>
+
+<script>
+const DATA = {"questions": [{"question": "What was the total awarded value in FY2023?", "template": "M1_BY_FY", "probabilities": {"M1_BY_FY": 1.0, "M1_BY_AGENCY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M2_TOP_N_FY": 0.0, "NO_DEFINED_METRIC": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0}, "parameters": {"fy": 2023}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M1", "name": "Awarded value", "definition": "Sum of amount_sgd where amount_sgd > 0 on tenders with awarded = true, attributed to the fiscal year of award_date. Contract value at award date, not cash spent. Multi-year contracts land entirely in the award year. Some values look like ceilings or estimates; the data does not say which."}, "headline": "S$21,682,674,098", "detail": "Awarded value, by value.", "audit": {"time": "2026-10-05T14:26:25+00:00", "step": "route", "question": "What was the total awarded value in FY2023?", "template": "M1_BY_FY", "probability": 1.0, "probabilities": {"M1_BY_FY": 1.0, "M1_BY_AGENCY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M2_TOP_N_FY": 0.0, "NO_DEFINED_METRIC": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2023}, "abstained": false, "reason": null, "result": [{"awarded_value_sgd": 21682674097.61997}]}}, {"question": "How much did the Housing and Development Board award in FY2024?", "template": "M1_BY_AGENCY_FY", "probabilities": {"M3_CATEGORY_SPEND_FY": 0.0, "NO_DEFINED_METRIC": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_FY": 0.0, "M1_BY_AGENCY_FY": 1.0, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M2_TOP_N_FY": 0.0}, "parameters": {"fy": 2024, "agency": "Housing and Development Board"}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M1", "name": "Awarded value", "definition": "Sum of amount_sgd where amount_sgd > 0 on tenders with awarded = true, attributed to the fiscal year of award_date. Contract value at award date, not cash spent. Multi-year contracts land entirely in the award year. Some values look like ceilings or estimates; the data does not say which."}, "headline": "S$9,020,817,207", "detail": "Awarded value, by value.", "audit": {"time": "2026-10-05T14:26:26+00:00", "step": "route", "question": "How much did the Housing and Development Board award in FY2024?", "template": "M1_BY_AGENCY_FY", "probability": 1.0, "probabilities": {"M3_CATEGORY_SPEND_FY": 0.0, "NO_DEFINED_METRIC": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_FY": 0.0, "M1_BY_AGENCY_FY": 1.0, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M2_TOP_N_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2024, "agency": "Housing and Development Board"}, "abstained": false, "reason": null, "result": [{"awarded_value_sgd": 9020817207.27}]}}, {"question": "What was the Land Transport Authority's awarded value in FY2022?", "template": "M1_BY_AGENCY_FY", "probabilities": {"M2_TOP_N_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_AGENCY_FY": 1.0, "M4_COVERAGE_COUNT_FY": 0.0, "NO_DEFINED_METRIC": 0.0, "M1_BY_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0}, "parameters": {"fy": 2022, "agency": "Land Transport Authority"}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M1", "name": "Awarded value", "definition": "Sum of amount_sgd where amount_sgd > 0 on tenders with awarded = true, attributed to the fiscal year of award_date. Contract value at award date, not cash spent. Multi-year contracts land entirely in the award year. Some values look like ceilings or estimates; the data does not say which."}, "headline": "S$5,575,621,106", "detail": "Awarded value, by value.", "audit": {"time": "2026-10-05T14:26:26+00:00", "step": "route", "question": "What was the Land Transport Authority's awarded value in FY2022?", "template": "M1_BY_AGENCY_FY", "probability": 1.0, "probabilities": {"M2_TOP_N_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_AGENCY_FY": 1.0, "M4_COVERAGE_COUNT_FY": 0.0, "NO_DEFINED_METRIC": 0.0, "M1_BY_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2022, "agency": "Land Transport Authority"}, "abstained": false, "reason": null, "result": [{"awarded_value_sgd": 5575621106.249999}]}}, {"question": "Do the top 10 suppliers hold a big share of awards in FY2023?", "template": "M2_TOP_N_FY", "probabilities": {"M4_COVERAGE_FY": 0.0, "M1_BY_FY": 0.0, "M2_TOP_N_FY": 0.99, "NO_DEFINED_METRIC": 0.01, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M1_BY_AGENCY_FY": 0.0}, "parameters": {"fy": 2023, "top_n": 10}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M2", "name": "Supplier concentration", "definition": "Share of M1 held by the top N suppliers within a slice. Uses normalized names. No entity resolution in v1."}, "headline": "31.2%", "detail": "Top 10 suppliers hold S$6,764,665,250 of S$21,682,674,098 awarded value, by value.", "audit": {"time": "2026-10-05T14:26:28+00:00", "step": "route", "question": "Do the top 10 suppliers hold a big share of awards in FY2023?", "template": "M2_TOP_N_FY", "probability": 0.99, "probabilities": {"M4_COVERAGE_FY": 0.0, "M1_BY_FY": 0.0, "M2_TOP_N_FY": 0.99, "NO_DEFINED_METRIC": 0.01, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M1_BY_AGENCY_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2023, "top_n": 10}, "abstained": false, "reason": null, "result": [{"top_n_sgd": 6764665249.900001, "total_sgd": 21682674097.61998, "top_n_share": 0.31198482343294226}]}}, {"question": "How concentrated were awards among the top 5 suppliers in FY2025?", "template": "M2_TOP_N_FY", "probabilities": {"M1_BY_AGENCY_FY": 0.0, "M2_TOP_N_FY": 1.0, "NO_DEFINED_METRIC": 0.0, "M1_BY_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0}, "parameters": {"fy": 2025, "top_n": 5}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M2", "name": "Supplier concentration", "definition": "Share of M1 held by the top N suppliers within a slice. Uses normalized names. No entity resolution in v1."}, "headline": "21.4%", "detail": "Top 5 suppliers hold S$6,599,881,417 of S$30,882,176,691 awarded value, by value.", "audit": {"time": "2026-10-05T14:26:29+00:00", "step": "route", "question": "How concentrated were awards among the top 5 suppliers in FY2025?", "template": "M2_TOP_N_FY", "probability": 1.0, "probabilities": {"M1_BY_AGENCY_FY": 0.0, "M2_TOP_N_FY": 1.0, "NO_DEFINED_METRIC": 0.0, "M1_BY_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2025, "top_n": 5}, "abstained": false, "reason": null, "result": [{"top_n_sgd": 6599881417.0, "total_sgd": 30882176690.760025, "top_n_share": 0.21371166556969706}]}}, {"question": "Show spend by category for FY2024.", "template": "M3_CATEGORY_SPEND_FY", "probabilities": {"M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "NO_DEFINED_METRIC": 0.04, "M3_CATEGORY_SPEND_FY": 0.96, "M4_COVERAGE_FY": 0.0, "M2_TOP_N_FY": 0.0, "M1_BY_FY": 0.0, "M1_BY_AGENCY_FY": 0.0}, "parameters": {"fy": 2024, "threshold": 0.7}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M3", "name": "Category spend", "definition": "M1 grouped by category, counting only tenders with probability >= threshold. Always reported alongside the UNCLASSIFIED remainder."}, "threshold": 0.7, "headline": "UNCLASSIFIED 8.4%", "detail": "S$2,300,591,200 of S$27,351,102,095 awarded value is below the threshold, by value.", "categories": [["C02 Construction & Civil Works", "S$20,128,245,948"], ["C03 Facilities Management", "S$1,599,083,274"], ["C01 IT & Digital Services", "S$1,037,906,653"], ["C09 Transport & Logistics", "S$716,543,749"], ["C07 Equipment & Goods Supply", "S$654,866,240"], ["C04 Professional & Consultancy Services", "S$532,295,403"], ["C06 Events, Communications & Training", "S$184,495,495"], ["C10 Other Services", "S$96,672,737"], ["C08 Medical & Healthcare Supplies", "S$76,864,289"], ["C05 Research & Studies", "S$23,537,108"], ["UNCLASSIFIED", "S$2,300,591,200"]], "audit": {"time": "2026-10-05T14:26:30+00:00", "step": "route", "question": "Show spend by category for FY2024.", "template": "M3_CATEGORY_SPEND_FY", "probability": 0.96, "probabilities": {"M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "NO_DEFINED_METRIC": 0.04, "M3_CATEGORY_SPEND_FY": 0.96, "M4_COVERAGE_FY": 0.0, "M2_TOP_N_FY": 0.0, "M1_BY_FY": 0.0, "M1_BY_AGENCY_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2024, "threshold": 0.7}, "abstained": false, "reason": null, "result": [{"category": "C02", "awarded_value_sgd": 20128245948.04}, {"category": "C03", "awarded_value_sgd": 1599083273.7800002}, {"category": "C01", "awarded_value_sgd": 1037906652.5300002}, {"category": "C09", "awarded_value_sgd": 716543748.78}, {"category": "C07", "awarded_value_sgd": 654866239.8699999}, {"category": "C04", "awarded_value_sgd": 532295402.70999986}, {"category": "C06", "awarded_value_sgd": 184495494.51}, {"category": "C10", "awarded_value_sgd": 96672737.08}, {"category": "C08", "awarded_value_sgd": 76864289.19999999}, {"category": "C05", "awarded_value_sgd": 23537108.0}]}}, {"question": "How much of FY2022 awarded value could we classify into a category?", "template": "M4_COVERAGE_FY", "probabilities": {"M2_TOP_N_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.01, "NO_DEFINED_METRIC": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M4_COVERAGE_FY": 0.99}, "parameters": {"fy": 2022, "threshold": 0.7}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M4", "name": "Classification coverage", "definition": "Share of M1 held by tenders with probability >= threshold. Report both by value and by count. The gap between the two is itself a finding."}, "threshold": 0.7, "headline": "89.3% classified", "detail": "UNCLASSIFIED 10.7%: S$17,614,302,099 of S$19,725,072,951, by value.", "audit": {"time": "2026-10-05T14:26:31+00:00", "step": "route", "question": "How much of FY2022 awarded value could we classify into a category?", "template": "M4_COVERAGE_FY", "probability": 0.99, "probabilities": {"M2_TOP_N_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.01, "NO_DEFINED_METRIC": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M4_COVERAGE_FY": 0.99}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2022, "threshold": 0.7}, "abstained": false, "reason": null, "result": [{"classified_sgd": 17614302098.65001, "total_sgd": 19725072951.039967}]}}, {"question": "How many FY2021 tenders did we classify, by count?", "template": "M4_COVERAGE_COUNT_FY", "probabilities": {"M4_COVERAGE_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "M1_BY_FY": 0.0, "M2_TOP_N_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "NO_DEFINED_METRIC": 0.02, "M4_COVERAGE_COUNT_FY": 0.98, "M1_BY_SUPPLIER_FY": 0.0}, "parameters": {"fy": 2021, "threshold": 0.7}, "abstained": false, "reason": null, "note": null, "metric": {"id": "M4", "name": "Classification coverage", "definition": "Share of M1 held by tenders with probability >= threshold. Report both by value and by count. The gap between the two is itself a finding."}, "threshold": 0.7, "headline": "87.2% classified", "detail": "UNCLASSIFIED 12.8%: 2,036 of 2,334 tenders, by count.", "audit": {"time": "2026-10-05T14:26:31+00:00", "step": "route", "question": "How many FY2021 tenders did we classify, by count?", "template": "M4_COVERAGE_COUNT_FY", "probability": 0.98, "probabilities": {"M4_COVERAGE_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "M1_BY_FY": 0.0, "M2_TOP_N_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "NO_DEFINED_METRIC": 0.02, "M4_COVERAGE_COUNT_FY": 0.98, "M1_BY_SUPPLIER_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2021, "threshold": 0.7}, "abstained": false, "reason": null, "result": [{"classified_tenders": 2036, "total_tenders": 2334}]}}, {"question": "How much did the Ministry of Education award?", "template": "M1_BY_AGENCY_FY", "probabilities": {"M2_TOP_N_FY": 0.0, "M1_BY_AGENCY_FY": 0.89, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "NO_DEFINED_METRIC": 0.11, "M3_CATEGORY_SPEND_FY": 0.0, "M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0}, "parameters": null, "abstained": true, "reason": "no fiscal year given", "note": null, "audit": {"time": "2026-10-05T14:26:32+00:00", "step": "route", "question": "How much did the Ministry of Education award?", "template": "M1_BY_AGENCY_FY", "probability": 0.89, "probabilities": {"M2_TOP_N_FY": 0.0, "M1_BY_AGENCY_FY": 0.89, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.0, "NO_DEFINED_METRIC": 0.11, "M3_CATEGORY_SPEND_FY": 0.0, "M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": null, "abstained": true, "reason": "no fiscal year given", "result": null}}, {"question": "How much was spent on IT?", "template": "M3_CATEGORY_SPEND_FY", "probabilities": {"NO_DEFINED_METRIC": 0.13, "M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M2_TOP_N_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.87, "M1_BY_SUPPLIER_FY": 0.0}, "parameters": null, "abstained": true, "reason": "no fiscal year given", "note": "Jev routed this to category spend at 0.87 and gave 'no defined metric' only 0.13. It abstained only because the question named no fiscal year. With a year added it would likely have answered, although 'spent' has no metric (awarded value is not spend). Known limit, left as it is.", "audit": {"time": "2026-10-05T14:26:32+00:00", "step": "route", "question": "How much was spent on IT?", "template": "M3_CATEGORY_SPEND_FY", "probability": 0.87, "probabilities": {"NO_DEFINED_METRIC": 0.13, "M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M2_TOP_N_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.87, "M1_BY_SUPPLIER_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": null, "abstained": true, "reason": "no fiscal year given", "result": null}}, {"question": "Who are our best suppliers?", "template": "NO_DEFINED_METRIC", "probabilities": {"M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.01, "M2_TOP_N_FY": 0.26, "M1_BY_AGENCY_FY": 0.0, "NO_DEFINED_METRIC": 0.73, "M3_CATEGORY_SPEND_FY": 0.0}, "parameters": null, "abstained": true, "reason": "no defined metric answers this question", "note": "Abstained because Jev chose 'no defined metric', and only just: 0.73 against a 0.7 line.", "audit": {"time": "2026-10-05T14:26:32+00:00", "step": "route", "question": "Who are our best suppliers?", "template": "NO_DEFINED_METRIC", "probability": 0.73, "probabilities": {"M1_BY_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M4_COVERAGE_FY": 0.0, "M1_BY_SUPPLIER_FY": 0.01, "M2_TOP_N_FY": 0.26, "M1_BY_AGENCY_FY": 0.0, "NO_DEFINED_METRIC": 0.73, "M3_CATEGORY_SPEND_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": null, "abstained": true, "reason": "no defined metric answers this question", "result": null}}, {"question": "What was the total for FY2023?", "template": "M1_BY_FY", "probabilities": {"M2_TOP_N_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "NO_DEFINED_METRIC": 0.02, "M4_COVERAGE_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_FY": 0.98, "M1_BY_SUPPLIER_FY": 0.0}, "parameters": {"fy": 2023}, "abstained": false, "reason": null, "note": "Expected to abstain as ambiguous, but Jev read 'total' as awarded value (M1) at 0.98. A reasonable reading, so the expectation was probably wrong.", "metric": {"id": "M1", "name": "Awarded value", "definition": "Sum of amount_sgd where amount_sgd > 0 on tenders with awarded = true, attributed to the fiscal year of award_date. Contract value at award date, not cash spent. Multi-year contracts land entirely in the award year. Some values look like ceilings or estimates; the data does not say which."}, "headline": "S$21,682,674,098", "detail": "Awarded value, by value.", "audit": {"time": "2026-10-05T14:26:33+00:00", "step": "route", "question": "What was the total for FY2023?", "template": "M1_BY_FY", "probability": 0.98, "probabilities": {"M2_TOP_N_FY": 0.0, "M3_CATEGORY_SPEND_FY": 0.0, "M1_BY_AGENCY_FY": 0.0, "NO_DEFINED_METRIC": 0.02, "M4_COVERAGE_FY": 0.0, "M4_COVERAGE_COUNT_FY": 0.0, "M1_BY_FY": 0.98, "M1_BY_SUPPLIER_FY": 0.0}, "model": "jev-1.13.0", "router_threshold": 0.7, "parameters": {"fy": 2023}, "abstained": false, "reason": null, "result": [{"awarded_value_sgd": 21682674097.61997}]}}], "coverage": [{"fy": 2021, "value": 96.5, "count": 87.2}, {"fy": 2022, "value": 89.3, "count": 86.0}, {"fy": 2023, "value": 96.3, "count": 87.0}, {"fy": 2024, "value": 91.6, "count": 89.0}, {"fy": 2025, "value": 90.8, "count": 87.0}]};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === t));
+  $('#p-router').hidden = t.id !== 'tab-router';
+  $('#p-cov').hidden = t.id !== 'tab-cov';
+}));
+
+// Question list
+const list = $('#list');
+DATA.questions.forEach((q, i) => {
+  const b = document.createElement('button');
+  b.className = 'q'; b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = `<span class="n">${i+1}</span><span class="t">${esc(q.question)}</span>` +
+    `<span class="badge ${q.abstained ? 'ab' : 'ok'}">${q.abstained ? 'Abstained' : 'Answered'}</span>`;
+  b.addEventListener('click', () => show(i));
+  list.appendChild(b);
+});
+
+function show(i) {
+  const q = DATA.questions[i];
+  document.querySelectorAll('.q').forEach((b, j) => b.setAttribute('aria-pressed', j === i));
+  const probs = Object.entries(q.probabilities).sort((a, b) => b[1] - a[1]).filter(([, p]) => p >= 0.005).slice(0, 4);
+  const rows = probs.map(([name, p]) =>
+    `<div class="prow ${name === q.template ? 'pick' : ''}"><span class="name" title="${esc(name)}">${esc(name)}</span>` +
+    `<span class="track"><span class="fill" style="display:block;width:${(p*100).toFixed(0)}%"></span></span>` +
+    `<span class="v">${p.toFixed(2)}</span></div>`).join('');
+  const params = q.parameters ? Object.entries(q.parameters).map(([k, v]) => `${k} = ${v}`).join(', ') : 'none filled';
+  const verdict = q.abstained
+    ? `<div class="verdict ab"><strong>Abstained</strong>${esc(q.reason)}. The router asks for a rephrased question instead of guessing.</div>`
+    : `<div class="verdict ok"><strong>Answered</strong><div class="big">${esc(q.headline)}</div><div>${esc(q.detail)}</div></div>`;
+  const cats = q.categories ? `<table><tr><th>Category</th><th class="r">Awarded value</th></tr>` +
+    q.categories.map(c => `<tr><td>${esc(c[0])}</td><td class="r">${esc(c[1])}</td></tr>`).join('') + `</table>` : '';
+  const def = q.metric ? `<p class="def"><strong>${esc(q.metric.id)} ${esc(q.metric.name)}.</strong> ${esc(q.metric.definition)}</p>` : '';
+  const note = q.note ? `<div class="note">${esc(q.note)}</div>` : '';
+  $('#detail').innerHTML =
+    `<h2>${esc(q.question)}</h2><p class="sub">Question ${i+1} of ${DATA.questions.length}</p>` +
+    `<div class="label">1. Jev chooses a template (probability)</div>${rows}` +
+    `<div class="label">2. Parameters filled by plain code</div><div>${esc(params)}</div>` +
+    `<div class="label">3. Result</div>${verdict}${cats}` +
+    (q.abstained ? '' : `<div class="label">Governed definition</div>${def}${q.threshold ? `<p class="def">Threshold used: probability ≥ ${q.threshold}.</p>` : ''}`) +
+    note +
+    `<details><summary>Audit log line</summary><pre>${esc(JSON.stringify(q.audit, null, 2))}</pre></details>`;
+}
+show(0);
+
+// Coverage
+$('#cov').innerHTML = DATA.coverage.map(r =>
+  `<div class="cov"><strong>FY${r.fy}</strong><div class="pair">` +
+  `<div class="track"><div class="fill" style="width:${r.value}%"></div></div><small>${r.value.toFixed(1)}% by value</small>` +
+  `<div class="track"><div class="fill count" style="width:${r.count}%"></div></div><small>${r.count.toFixed(1)}% by count</small>` +
+  `</div></div>`).join('');
+</script>
+</body>
+</html>

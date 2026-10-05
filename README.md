@@ -21,6 +21,7 @@ In an audited setting, a model should not write its own queries or invent its ow
 | 4 | Calibration: set the confidence threshold on about 30 hand labels | Done. Threshold 0.7 on probability; see RESULTS.md |
 | 5 | Router: a natural-language question picks one template, or abstains | Done with caveats. 12 demo questions: 9 answered, 3 abstained. Two known limits (spend questions, ambiguity); see RESULTS.md |
 | 6 | Audit log of every classification and router decision | Done. `classification_log.jsonl` and `router_log.jsonl` (one line per router call) |
+| 6a | Replay page: one static HTML file (`demo/index.html`) replaying the 12 router questions and the M4 coverage finding | Done. No live calls, no key; open the file in a browser |
 
 Verified so far: the graph holds 12,052 tenders, 113 agencies and 6,134 suppliers. Awarded value by fiscal year from Cypher matches an independent pandas calculation to the dollar for FY2021 to FY2025.
 
@@ -54,6 +55,9 @@ Things to know before reading any number from it:
 | `helpers/calibrate.py` | Compares Jev with those labels and shows what each threshold would do |
 | `classification_log.jsonl` | Audit log of every classification (git-ignored, regenerable) |
 | `router_log.jsonl` | Audit log of every router call (git-ignored) |
+| `demo/index.html` | Step 6a: static replay of the router demo and the coverage finding (data embedded from the router run on 2026-10-05) |
+| `THESIS_NOTE.md` | The Phase 1 thesis note: what was built, the decisions and trade-offs, and what it means for Jev |
+| `LICENSE` | MIT, covers the code and write-up only. The GeBIZ data keeps its own Open Data Licence |
 
 ## Run it
 

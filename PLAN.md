@@ -46,3 +46,5 @@ Append new entries at the bottom. Do not rewrite old ones; if a decision changes
 | 2026-10-05 | Router audit log is a separate file, `router_log.jsonl` (git-ignored). Answers are printed in the terminal with definition, threshold and UNCLASSIFIED share. |
 | 2026-10-05 | Spend question not fixed (option 1). No guard, and the option descriptions are not tuned to the test result. Recorded as a limit in RESULTS.md. |
 | 2026-10-05 | Future work, not Phase 1: a Claude model via API for parameter extraction and supplier matching; a very simple UI; rewording the option descriptions (for example "not spend") if the spend limit matters. |
+| 2026-10-05 | Step 6a added: one static replay page, `demo/index.html`, with the 12 router results and the M4 coverage by fiscal year embedded. No live calls, because a page cannot reach the local Neo4j and a key in a page would be public. Interactive queries stay out of scope. Owner: nothing further beyond this. |
+| 2026-10-05 | Repo to be made public with an MIT licence (code and write-up). The GeBIZ data stays under its own Open Data Licence, attributed in README. |
