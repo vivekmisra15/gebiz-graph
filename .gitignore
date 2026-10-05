@@ -14,3 +14,6 @@ __pycache__/
 
 # Regenerable audit output from step 3
 classification_log.jsonl
+
+# Router audit output from step 5
+router_log.jsonl
