@@ -1,8 +1,8 @@
 """
-gebiz_graph.py: GeBIZ knowledge graph, build steps 1 to 3 (loader, metric layer, classification).
+gebiz_graph.py: GeBIZ knowledge graph, build steps 1 to 6 (loader, metric layer, classification, router, audit log).
 
 Design reference: SCHEMA.md (v0.3). Project rules: CLAUDE.md.
-Steps 4 onward (calibration, router, full audit log) are NOT here yet.
+Step 4 (calibration) lives in helpers/calibrate.py; its result is the THRESHOLD constant.
 
 WHAT IT DOES
   1. Reads gebiz.csv and applies the loader rules (SCHEMA.md section 7).
