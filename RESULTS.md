@@ -97,3 +97,33 @@ Cost of each threshold across all 12,052 tenders (probability): coverage by coun
 - The labels come from the pool the taxonomy's boundary rules were derived from, and were picked 3 per category (not a random draw across categories), so 90% accuracy is likely an upper bound for the other tenders.
 - The abstention test row (DEF000ETT20300060, "Please refer to the attached tender documents") scores probability 0.99, so it does not abstain at any threshold. This is the vague-text weakness recorded under step 3. Calibration cannot fix it: the cause is how Jev reads C10, not the threshold.
 - Agreement here is accuracy only for these 30 labelled tenders.
+
+
+## Step 5: router demo (2026-10-05)
+
+Run with `python gebiz_graph.py --demo`. Jev (jev-1.13.0) picks the template; plain code fills the parameters. Router threshold 0.7 on the template probability; classification threshold 0.7. 12 questions: 9 answered, 3 abstained. Audit lines are in `router_log.jsonl` (git-ignored).
+
+| # | Question (short) | Jev's choice (probability) | Outcome |
+|---|---|---|---|
+| 1 | Total awarded value FY2023 | M1_BY_FY (1.00) | Answered: S$21,682,674,098 by value |
+| 2 | Housing and Development Board FY2024 | M1_BY_AGENCY_FY (1.00) | Answered: S$9,020,817,207 by value |
+| 3 | Land Transport Authority FY2022 | M1_BY_AGENCY_FY (1.00) | Answered: S$5,575,621,106 by value |
+| 4 | Top 10 suppliers FY2023 | M2_TOP_N_FY (0.99) | Answered: 31.2% of S$21,682,674,098 |
+| 5 | Top 5 suppliers FY2025 | M2_TOP_N_FY (1.00) | Answered: 21.4% of S$30,882,176,691 |
+| 6 | Spend by category FY2024 | M3_CATEGORY_SPEND_FY (0.96) | Answered: UNCLASSIFIED 8.4% of S$27,351,102,095 by value |
+| 7 | FY2022 value that could be classified | M4_COVERAGE_FY (0.99) | Answered: 89.3% classified by value |
+| 8 | FY2021 tenders classified, by count | M4_COVERAGE_COUNT_FY (0.98) | Answered: 87.2% (2,036 of 2,334) by count |
+| 9 | Ministry of Education award, no year | M1_BY_AGENCY_FY (0.89) | Abstained: no fiscal year |
+| 10 | How much was spent on IT? | M3_CATEGORY_SPEND_FY (0.87) | Abstained, but only because no fiscal year was given |
+| 11 | Who are our best suppliers? | NO_DEFINED_METRIC (0.73) | Abstained: no defined metric |
+| 12 | What was the total for FY2023? | M1_BY_FY (0.98) | Answered (expected abstention did not happen) |
+
+Cross-checks: Q6 to Q8 equal the step 4 figures above (FY2022 89.3% by value, FY2021 87.2% by count, FY2024 91.6% classified). Q1 equals the M1 value verified against pandas in step 2.
+
+### Surprises and limits
+
+- **Q10 abstained for the wrong reason.** Jev chose M3 at 0.87 and gave `NO_DEFINED_METRIC` only 0.13. "How much was spent on IT in FY2024?" would probably be answered with the whole category table, although "spent" has no metric (M1 is awarded value, not cash spent). Not run, so this is an inference. Decision: left as it is and recorded here (PLAN.md, 2026-10-05). The router needs an explicit check for concepts the metric layer does not define.
+- **Q12 did not abstain.** Jev read "total" as M1 at 0.98. That is a reasonable reading, so the expectation in the demo list was probably wrong. Wording and threshold were not changed.
+- **Q11 was close:** `NO_DEFINED_METRIC` at 0.73, just above 0.7.
+- **Two of the three intended abstentions** (Q9, Q11) abstained for the right reason; Q10 by luck; Q12 not at all. 12 questions show the mechanism works, not how often it works.
+- Supplier questions are not supported: the router abstains if Jev picks `M1_BY_SUPPLIER_FY`. Untested on a real question.
