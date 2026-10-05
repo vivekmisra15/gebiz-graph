@@ -19,8 +19,8 @@ In an audited setting, a model should not write its own queries or invent its ow
 | 2 | Metric layer: Metric nodes M1 to M4 and fixed Cypher templates | Done. M1 to M4 all verified against pandas (M3 and M4 after step 3) |
 | 3 | Classification of each tender into the taxonomy (Jev, plus a keyword fallback) | Done. 12,052 tenders classified, 0 failures; findings in RESULTS.md |
 | 4 | Calibration: set the confidence threshold on about 30 hand labels | Done. Threshold 0.7 on probability; see RESULTS.md |
-| 5 | Router: a natural-language question picks one template, or abstains | Not started |
-| 6 | Audit log of every classification and router decision | Not started |
+| 5 | Router: a natural-language question picks one template, or abstains | Done with caveats. 12 demo questions: 9 answered, 3 abstained. Two known limits (spend questions, ambiguity); see RESULTS.md |
+| 6 | Audit log of every classification and router decision | Done. `classification_log.jsonl` and `router_log.jsonl` (one line per router call) |
 
 Verified so far: the graph holds 12,052 tenders, 113 agencies and 6,134 suppliers. Awarded value by fiscal year from Cypher matches an independent pandas calculation to the dollar for FY2021 to FY2025.
 
@@ -53,6 +53,7 @@ Things to know before reading any number from it:
 | `calibration_labels.csv` | The 30 owner-approved hand labels used to calibrate the threshold |
 | `helpers/calibrate.py` | Compares Jev with those labels and shows what each threshold would do |
 | `classification_log.jsonl` | Audit log of every classification (git-ignored, regenerable) |
+| `router_log.jsonl` | Audit log of every router call (git-ignored) |
 
 ## Run it
 
