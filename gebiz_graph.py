@@ -34,6 +34,9 @@ RUN
     python gebiz_graph.py --reset          # wipe graph data first, then reload
     python gebiz_graph.py --trial 20       # step 3 dry run on 20 hand-labelled tenders, no Neo4j writes
     python gebiz_graph.py --classify       # step 3 full run: Jev on every tender, writes CLASSIFIED_AS
+    python gebiz_graph.py --demo           # step 5: the 12 fixed demo questions through the router
+    python gebiz_graph.py --route "How much did the Ministry of Education award in FY2023?"
+  Every router call appends a line to router_log.jsonl (git-ignored).
   Without TYPESAFE_API_KEY, --trial uses the keyword rules instead of Jev.
   Every classification appends a line to classification_log.jsonl (git-ignored).
 
@@ -832,6 +835,196 @@ def classification_metric_checks(driver, awarded, df):
 
 
 # ---------------------------------------------------------------------------
+# STEP 5 and 6: router (Jev picks a template) and its audit log
+# ---------------------------------------------------------------------------
+# The router never writes Cypher. Jev makes ONE closed-set choice among the templates
+# above (plus a "no defined metric" option). Plain code then fills the parameters from
+# the question. If Jev is not confident, no metric fits, or a parameter is missing, the
+# router abstains and says what it needs. Every call appends one line to router_log.jsonl.
+
+ROUTER_THRESHOLD = 0.7        # on the template probability; separate from THRESHOLD so each can change alone
+ROUTER_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "router_log.jsonl")
+NO_METRIC = "NO_DEFINED_METRIC"
+ROUTER_QUESTION_TEXT = ("Pick the one option that answers this question about Singapore government "
+                        "procurement awards. If none of the defined metrics answers it, pick "
+                        + NO_METRIC + ".")
+
+# What Jev reads for each option. Plain descriptions of the governed templates, not the Cypher.
+ROUTER_OPTIONS = {
+    "M1_BY_FY": "Total awarded contract value across all agencies in one fiscal year.",
+    "M1_BY_AGENCY_FY": "Awarded contract value of one named agency in one fiscal year.",
+    "M1_BY_SUPPLIER_FY": "Awarded contract value won by one named supplier in one fiscal year.",
+    "M2_TOP_N_FY": "Supplier concentration: the share of awarded value held by the top N suppliers in one fiscal year.",
+    "M3_CATEGORY_SPEND_FY": "Awarded value broken down by procurement category (what is being bought) in one fiscal year.",
+    "M4_COVERAGE_FY": "Classification coverage by VALUE: how much of the awarded value (S$) could be classified into a category with confidence.",
+    "M4_COVERAGE_COUNT_FY": "Classification coverage by COUNT: how many tenders could be classified into a category with confidence.",
+    NO_METRIC: "The question asks for something none of the other options defines, for example spending, "
+               "'best' suppliers, trends, forecasts or opinions.",
+}
+assert set(ROUTER_OPTIONS) == set(TEMPLATES) | {NO_METRIC}, "router options must match TEMPLATES"
+
+# Fixed demo set (CLAUDE.md step 5). Not an evaluation benchmark: do not expand it.
+# The second item says what the router is expected to do, for the owner's reading only.
+DEMO_QUESTIONS = [
+    ("What was the total awarded value in FY2023?", "M1_BY_FY"),
+    ("How much did the Housing and Development Board award in FY2024?", "M1_BY_AGENCY_FY"),
+    ("What was the Land Transport Authority's awarded value in FY2022?", "M1_BY_AGENCY_FY"),
+    ("Do the top 10 suppliers hold a big share of awards in FY2023?", "M2_TOP_N_FY"),
+    ("How concentrated were awards among the top 5 suppliers in FY2025?", "M2_TOP_N_FY"),
+    ("Show spend by category for FY2024.", "M3_CATEGORY_SPEND_FY"),
+    ("How much of FY2022 awarded value could we classify into a category?", "M4_COVERAGE_FY"),
+    ("How many FY2021 tenders did we classify, by count?", "M4_COVERAGE_COUNT_FY"),
+    ("How much did the Ministry of Education award?", "abstain: no fiscal year"),
+    ("How much was spent on IT?", "abstain: no defined metric"),
+    ("Who are our best suppliers?", "abstain: no defined metric"),
+    ("What was the total for FY2023?", "abstain expected: M1 or M4 is unclear"),
+]
+
+
+def route_with_jev(question):
+    """One Jev call: a closed-set Choice over the templates. Returns choice and probabilities."""
+    from typesafe_sdk import Choice
+    choice = Choice(instructions=ROUTER_QUESTION_TEXT, criteria=ROUTER_OPTIONS)
+    resp = jev_client().system_one(state=question, questions={"template": choice}, model=JEV_MODEL)
+    ans = resp.answers["template"]
+    if ans.choice not in ROUTER_OPTIONS:
+        raise ValueError(f"Jev returned a choice outside the router options: {ans.choice!r}")
+    return {"template": ans.choice, "probability": ans.probabilities[ans.choice],
+            "probabilities": dict(ans.probabilities), "model": JEV_MODEL}
+
+
+def extract_fiscal_year(question):
+    """Plain pattern match: 'FY2023' or a bare year 2021 to 2025. Returns (fy, problem)."""
+    years = {int(y) for y in re.findall(r"(?<!\d)(20\d\d)(?!\d)", question)}
+    if not years:
+        return None, "no fiscal year given"
+    if len(years) > 1:
+        return None, "more than one fiscal year given"
+    fy = years.pop()
+    if fy not in FISCAL_YEARS:
+        return None, f"no data for FY{fy} (data covers FY{FISCAL_YEARS[0]} to FY{FISCAL_YEARS[-1]})"
+    return fy, None
+
+
+def extract_agency(question, agency_names):
+    """The longest known agency name found in the question (case-insensitive), or None."""
+    q = question.lower()
+    found = [a for a in agency_names if a.lower() in q]
+    return max(found, key=len) if found else None
+
+
+def extract_top_n(question):
+    match = re.search(r"top\s+(\d+)", question, flags=re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def fill_parameters(template_id, question, agency_names):
+    """Fill the template's parameters by plain matching. Returns (params, problem).
+    The classification threshold is never taken from the question."""
+    params, problems = {}, []
+    wanted = TEMPLATES[template_id]["params"]
+    if "supplier" in wanted:
+        return None, "supplier name matching is not built in Phase 1 (deferred; needs an LLM)"
+    if "fy" in wanted:
+        params["fy"], problem = extract_fiscal_year(question)
+        if problem:
+            problems.append(problem)
+    if "agency" in wanted:
+        params["agency"] = extract_agency(question, agency_names)
+        if params["agency"] is None:
+            problems.append("no known agency name given")
+    elif extract_agency(question, agency_names):
+        problems.append(f"{template_id} cannot be sliced by agency")   # the question asks for a slice no template has
+    if "top_n" in wanted:
+        params["top_n"] = extract_top_n(question)
+        if params["top_n"] is None:
+            problems.append("no 'top N' given")
+    if "threshold" in wanted:
+        params["threshold"] = THRESHOLD
+    return (None, "; ".join(problems)) if problems else (params, None)
+
+
+def format_answer(driver, template_id, params, rows):
+    """Plain-text answer with the governed definition, the threshold and the UNCLASSIFIED share."""
+    metric = next(m for m in METRICS if m["id"] == TEMPLATES[template_id]["metric_id"])
+    lines = [f"{metric['id']} {metric['name']} (v{metric['version']}): {metric['definition']}"]
+    r = rows[0] if rows else {}
+    if template_id.startswith("M1"):
+        lines.append(f"Answer: {money(r.get('awarded_value_sgd') or 0)} awarded value (by value).")
+    elif template_id == "M2_TOP_N_FY":
+        lines.append(f"Answer: top {params['top_n']} suppliers hold {r['top_n_share']:.1%} of "
+                     f"{money(r['total_sgd'])} awarded value (by value; {money(r['top_n_sgd'])}).")
+    elif template_id == "M4_COVERAGE_FY":
+        share = r["classified_sgd"] / r["total_sgd"]
+        lines.append(f"Answer: {share:.1%} classified, UNCLASSIFIED {1 - share:.1%} "
+                     f"({money(r['classified_sgd'])} of {money(r['total_sgd'])}, by value).")
+    elif template_id == "M4_COVERAGE_COUNT_FY":
+        share = r["classified_tenders"] / r["total_tenders"]
+        lines.append(f"Answer: {share:.1%} classified, UNCLASSIFIED {1 - share:.1%} "
+                     f"({r['classified_tenders']:,} of {r['total_tenders']:,} tenders, by count).")
+    elif template_id == "M3_CATEGORY_SPEND_FY":
+        total = run_template(driver, "M4_COVERAGE_FY", {"fy": params["fy"], "threshold": THRESHOLD})[0]
+        for row in rows:
+            lines.append(f"  {row['category']} {CODE_TO_LABEL[row['category']]}: {money(row['awarded_value_sgd'])}")
+        classified = sum(row["awarded_value_sgd"] for row in rows)
+        lines.append(f"  UNCLASSIFIED: {money(total['total_sgd'] - classified)} "
+                     f"({1 - classified / total['total_sgd']:.1%} of {money(total['total_sgd'])}, by value)")
+    if "threshold" in params:
+        lines.append(f"Threshold used: probability >= {params['threshold']}.")
+    return "\n".join(lines)
+
+
+def append_router_log(entry):
+    """Step 6: one JSON line per router call."""
+    import json
+    from datetime import datetime, timezone
+    entry = {"time": datetime.now(timezone.utc).isoformat(timespec="seconds"), "step": "route", **entry}
+    with open(ROUTER_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, default=str) + "\n")
+
+
+def route_question(driver, question, agency_names):
+    """Question in, printed answer or abstention out, one audit line written either way."""
+    decision = route_with_jev(question)
+    template_id, prob = decision["template"], decision["probability"]
+    params, reason, rows, answer = None, None, None, None
+    if template_id == NO_METRIC:
+        reason = "no defined metric answers this question"
+    elif prob < ROUTER_THRESHOLD:
+        reason = f"template choice not confident enough (probability {prob:.2f} < {ROUTER_THRESHOLD})"
+    else:
+        params, reason = fill_parameters(template_id, question, agency_names)
+    if reason is None:
+        rows = run_template(driver, template_id, params)
+        answer = format_answer(driver, template_id, params, rows)
+    abstained = reason is not None
+
+    top3 = sorted(decision["probabilities"].items(), key=lambda kv: -kv[1])[:3]
+    print(f"\nQ: {question}")
+    print("  Jev: " + ", ".join(f"{t} {p:.2f}" for t, p in top3))
+    if abstained:
+        print(f"  ABSTAINED: {reason}. Please rephrase or add the missing detail.")
+    else:
+        print(f"  Template: {template_id}  Parameters: {params}")
+        print("  " + answer.replace("\n", "\n  "))
+    append_router_log({"question": question, "template": template_id, "probability": prob,
+                       "probabilities": decision["probabilities"], "model": decision["model"],
+                       "router_threshold": ROUTER_THRESHOLD, "parameters": params,
+                       "result": rows, "abstained": abstained, "reason": reason})
+    return not abstained
+
+
+def run_router(driver, questions):
+    if not os.environ.get("TYPESAFE_API_KEY"):
+        sys.exit("The router needs TYPESAFE_API_KEY (Jev picks the template). Nothing was run.")
+    with session_for(driver) as session:
+        agency_names = [r["name"] for r in session.run("MATCH (a:Agency) RETURN a.name AS name")]
+    answered = sum(route_question(driver, q, agency_names) for q in questions)
+    print(f"\nRouter: {answered} answered, {len(questions) - answered} abstained, "
+          f"{len(questions)} questions. Audit lines appended to {os.path.basename(ROUTER_LOG_PATH)}.")
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -844,7 +1037,18 @@ def main():
                         help="step 3 dry run: classify N hand-labelled sample tenders, write nothing to Neo4j")
     parser.add_argument("--classify", action="store_true",
                         help="step 3 full run: classify every tender with Jev and write CLASSIFIED_AS edges")
+    parser.add_argument("--route", metavar="QUESTION",
+                        help="step 5: answer one natural-language question through the router")
+    parser.add_argument("--demo", action="store_true",
+                        help="step 5: run the 12 fixed demo questions through the router")
     args = parser.parse_args()
+    if args.route or args.demo:                      # router only: needs Neo4j and Jev, not the CSV
+        driver = connect()
+        try:
+            run_router(driver, [args.route] if args.route else [q for q, _expected in DEMO_QUESTIONS])
+        finally:
+            driver.close()
+        return
     if args.trial is not None and not 1 <= args.trial <= 150:
         sys.exit("--trial N needs N between 1 and 150 (the size of the hand-labelled sample).")
 
