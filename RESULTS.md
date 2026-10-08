@@ -127,3 +127,18 @@ Cross-checks: Q6 to Q8 equal the step 4 figures above (FY2022 89.3% by value, FY
 - **Q11 was close:** `NO_DEFINED_METRIC` at 0.73, just above 0.7.
 - **Two of the three intended abstentions** (Q9, Q11) abstained for the right reason; Q10 by luck; Q12 not at all. 12 questions show the mechanism works, not how often it works.
 - Supplier questions are not supported: the router abstains if Jev picks `M1_BY_SUPPLIER_FY`. Untested on a real question.
+
+## Repeatability check (2026-10-08)
+
+Run with `python helpers/repeatability_check.py` (needs `TYPESAFE_API_KEY`, no Neo4j, about 84 Jev calls). Each input has three observations: the stored audit-log line (2026-10-04 for tenders, 2026-10-05 for router questions) and two fresh calls on 2026-10-08. Model `jev-1.13.0` throughout.
+
+| Set | Inputs | Chosen option changed | 0.7 decision flipped | Largest change, chosen option's probability |
+|---|---|---|---|---|
+| Calibration tenders (classification) | 30 | 0 | 0 | 0.11 (25 of 30 moved by 0.02 or less) |
+| Router demo questions | 12 | 0 | 0 | 0.05 (7 of 12 did not move) |
+
+- The same input gave the same chosen option every time, on the same model version, over four days. Probabilities drift by a few hundredths, up to 0.11.
+- **Limit of the check:** none of the 30 tenders sits near 0.7, so no flip could be seen. From the stored full-run probabilities, 239 of 12,052 tenders (2.0%) lie within 0.02 of 0.7, 657 (5.5%) within 0.05, and 1,446 (12.0%) within 0.11. Tenders in that band could land on the other side of the threshold if re-run. This is inferred from the stored probabilities; those tenders were not re-run.
+- **What this means for the audit claim:** the audit log is the record of a decision. A re-run is a check on it, not a replacement. A different model version is not covered by this check.
+- **Model version is stored** on every audit-log line and, by the write query in `gebiz_graph.py` (`WRITE_CLASSIFICATIONS`), on every `CLASSIFIED_AS` edge (`model`, `taxonomy_version`). The code was read; the live database was not queried.
+- **For the router limits:** probability noise of 0.05 to 0.11 is the same size as the gaps a margin rule would use (Q11 sat at 0.73 against 0.7). Tuning such a rule on 12 questions would fit noise.
